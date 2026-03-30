@@ -18,34 +18,22 @@ function hexToRgb(hex) {
     };
 }
 
-// --- Fade helper ---
-function fadeLamp(lampNumber, targetColor, fadeTime = 2000, callback) {
-    const base = (lampNumber - 1) * 8 + 1;
-    const { r: targetR, g: targetG, b: targetB } = hexToRgb(targetColor);
+// --- Fade dimmer only ---
+function fadeDimmer(lampNumber, targetDim, fadeTime = 2000, callback) {
+    const base = (lampNumber - 1) * 8 + 1; // kanal 1 = dimmer
+    let currentDim = 0;
 
-    // Hent nuværende værdier (starter fra 0 hvis intet er sat)
-    let currentR = 0, currentG = 0, currentB = 0;
-    let stepCount = Math.floor(fadeTime / 50); // 50ms interval
-    let stepR = (targetR - currentR) / stepCount;
-    let stepG = (targetG - currentG) / stepCount;
-    let stepB = (targetB - currentB) / stepCount;
+    // Hent nuværende dimmer (kan evt. gemmes globalt hvis nødvendigt)
+    // Vi starter altid fra 0 for fade-in
+    const stepCount = Math.floor(fadeTime / 50);
+    const step = (targetDim - currentDim) / stepCount;
 
     let i = 0;
     const interval = setInterval(() => {
         i++;
-        currentR += stepR;
-        currentG += stepG;
-        currentB += stepB;
-
+        currentDim += step;
         universe.update({
-            [base]  : Math.round(currentR), // Red
-            [base+1]: Math.round(currentG), // Green
-            [base+2]: Math.round(currentB), // Blue
-            [base+3]: 255,                  // Dimmer max
-            [base+4]: 0,                    // White
-            [base+5]: 0,                    // Strobe
-            [base+6]: 0,                    // Macro
-            [base+7]: 0                     // Speed
+            [base]: Math.round(Math.max(0, Math.min(255, currentDim)))
         });
 
         if(i >= stepCount) {
@@ -55,54 +43,43 @@ function fadeLamp(lampNumber, targetColor, fadeTime = 2000, callback) {
     }, 50);
 }
 
-// --- Fade out helper ---
-function fadeLampOut(lampNumber, fadeTime = 2000, callback) {
+// --- Turn lamp on ---
+function turnLampOn(lampNumber, hexColor, fadeTime = 2000) {
     const base = (lampNumber - 1) * 8 + 1;
+    const { r, g, b } = hexToRgb(hexColor);
 
-    // Antag nuværende RGB = 255 på alle kanaler (eller det sidste vi satte)
-    let currentR = 255, currentG = 255, currentB = 255;
-    let stepCount = Math.floor(fadeTime / 50);
-    let stepR = currentR / stepCount;
-    let stepG = currentG / stepCount;
-    let stepB = currentB / stepCount;
+    // Sæt RGB med det samme, dimmer = 0
+    universe.update({
+        [base+1]: r,
+        [base+2]: g,
+        [base+3]: b,
+        [base+4]: 0,  // white
+        [base+5]: 0,  // strobe
+        [base+6]: 0,  // macro
+        [base+7]: 0   // speed
+    });
 
-    let i = 0;
-    const interval = setInterval(() => {
-        i++;
-        currentR -= stepR;
-        currentG -= stepG;
-        currentB -= stepB;
+    // Fade dimmer op til 255
+    fadeDimmer(lampNumber, 255, fadeTime);
+}
 
-        universe.update({
-            [base]  : Math.round(Math.max(0,currentR)),
-            [base+1]: Math.round(Math.max(0,currentG)),
-            [base+2]: Math.round(Math.max(0,currentB)),
-            [base+3]: Math.round(Math.max(0,255 - (255/stepCount*i))), // Dimmer
-            [base+4]: 0,
-            [base+5]: 0,
-            [base+6]: 0,
-            [base+7]: 0
-        });
-
-        if(i >= stepCount) {
-            clearInterval(interval);
-            if(callback) callback();
-        }
-    }, 50);
+// --- Turn lamp off ---
+function turnLampOff(lampNumber, fadeTime = 2000) {
+    fadeDimmer(lampNumber, 0, fadeTime);
 }
 
 // --- Webhook endpoints ---
 app.post("/on", (req,res)=>{
     const { lamp, color } = req.body;
     if(!lamp || !color) return res.status(400).send("Missing lamp or color");
-    fadeLamp(lamp, color, 2000, ()=>console.log(`Lamp ${lamp} fully on`));
+    turnLampOn(lamp, color, 2000);
     res.send(`Fading on lamp ${lamp} with color ${color}`);
 });
 
 app.post("/off", (req,res)=>{
     const { lamp } = req.body;
     if(!lamp) return res.status(400).send("Missing lamp");
-    fadeLampOut(lamp, 2000, ()=>console.log(`Lamp ${lamp} fully off`));
+    turnLampOff(lamp, 2000);
     res.send(`Fading off lamp ${lamp}`);
 });
 
