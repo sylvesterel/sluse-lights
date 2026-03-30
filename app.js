@@ -28,7 +28,7 @@ function hexToRgb(hex) {
 
 // --- Sæt lampe ---
 function setLamp(lampNumber, hexColor) {
-    const base = (lampNumber - 1) * 8 + 1;
+    const base = (lampNumber) * 8 + 1;
     const { r, g, b } = hexToRgb(hexColor);
 
     const channels = {};
@@ -58,7 +58,7 @@ function offLamp(lampNumber) {
 }
 
 //
-// 🌐 WEBHOOKS
+// WEBHOOKS
 //
 
 // Tænd lampe med farve
